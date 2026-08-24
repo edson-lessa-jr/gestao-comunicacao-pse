@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy": "wrangler d1 migrations apply gestao-comunicacao-pse --remote && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "lint": "eslint . --ignore-pattern .open-next --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply gestao-comunicacao-pse --local",
