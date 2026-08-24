@@ -30,12 +30,7 @@ Copie o identificador do banco e substitua `COLE_AQUI_O_ID_DO_BANCO_D1` em `wran
 
 ### 2. Criar as tabelas
 
-Com o Wrangler autenticado, execute:
-
-```bash
-npm ci
-npm run db:migrate:remote
-```
+O comando de implantação executa automaticamente as migrações pendentes antes de publicar a aplicação. O primeiro deploy criará as tabelas necessárias.
 
 ### 3. Configurar os segredos
 
