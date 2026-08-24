@@ -16,6 +16,13 @@
       "migrations_dir": "drizzle"
     }
   ],
+  "secrets": {
+    "required": [
+      "PSE_ADMIN_USER",
+      "PSE_ADMIN_PASSWORD",
+      "PSE_SESSION_SECRET"
+    ]
+  },
   "observability": {
     "enabled": true
   }
