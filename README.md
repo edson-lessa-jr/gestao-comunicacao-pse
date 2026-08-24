@@ -26,7 +26,7 @@ Sistema para criar, pré-visualizar, publicar e consultar comunicados da Platafo
 
 No painel da Cloudflare, acesse **Storage & Databases > D1 SQL Database** e crie um banco chamado `gestao-comunicacao-pse`.
 
-Copie o identificador do banco e substitua `COLE_AQUI_O_ID_DO_BANCO_D1` em `wrangler.jsonc`.
+O vínculo `DB` e o identificador do banco estão configurados em `wrangler.jsonc`.
 
 ### 2. Criar as tabelas
 
