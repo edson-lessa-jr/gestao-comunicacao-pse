@@ -1,0 +1,2 @@
+import{createSessionCookie,verifyCredentials}from"../../../lib/auth";
+export async function POST(request:Request){try{const{username="",password=""}=await request.json()as{username?:string;password?:string};if(!(await verifyCredentials(username,password)))return Response.json({error:"Credenciais inválidas"},{status:401});return Response.json({ok:true},{headers:{"Set-Cookie":await createSessionCookie(username)}})}catch(error){return Response.json({error:error instanceof Error?error.message:"Falha ao autenticar"},{status:500})}}

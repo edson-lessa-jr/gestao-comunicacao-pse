@@ -1,0 +1,12 @@
+import{getCloudflareContext}from"@opennextjs/cloudflare";
+const COOKIE_NAME="pse_session",MAX_AGE=60*60*8;
+function runtimeEnv(){return getCloudflareContext().env as unknown as Record<string,string|undefined>}
+function base64url(value:string){return btoa(value).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
+function fromBase64url(value:string){return atob(value.replace(/-/g,"+").replace(/_/g,"/"))}
+async function hmac(value:string){const secret=runtimeEnv().PSE_SESSION_SECRET;if(!secret)throw new Error("PSE_SESSION_SECRET não configurado");const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return base64url(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(value)))))}
+function safeEqual(a:string,b:string){if(a.length!==b.length)return false;let difference=0;for(let index=0;index<a.length;index++)difference|=a.charCodeAt(index)^b.charCodeAt(index);return difference===0}
+export async function verifyCredentials(username:string,password:string){const expectedUser=runtimeEnv().PSE_ADMIN_USER,expectedPassword=runtimeEnv().PSE_ADMIN_PASSWORD;if(!expectedUser||!expectedPassword)throw new Error("Credenciais administrativas não configuradas");return safeEqual(username,expectedUser)&&safeEqual(password,expectedPassword)}
+export async function createSessionCookie(username:string){const payload=base64url(JSON.stringify({username,expiresAt:Date.now()+MAX_AGE*1000})),signature=await hmac(payload);return `${COOKIE_NAME}=${payload}.${signature}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${MAX_AGE}`}
+export function clearSessionCookie(){return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`}
+export async function authenticatedUser(request:Request){const cookie=request.headers.get("cookie")??"",token=cookie.split(";").map(part=>part.trim()).find(part=>part.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length+1);if(!token)return null;const[payload,signature]=token.split(".");if(!payload||!signature||!safeEqual(await hmac(payload),signature))return null;try{const data=JSON.parse(fromBase64url(payload))as{username:string;expiresAt:number};return data.expiresAt>Date.now()?data.username:null}catch{return null}}
+export async function requireApiUser(request:Request){const username=await authenticatedUser(request);return username?{username}:null}
