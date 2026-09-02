@@ -10,7 +10,9 @@ Sistema para criar, pré-visualizar, publicar e consultar comunicados da Platafo
 - publicação definitiva, sem alteração ou cancelamento posterior;
 - pesquisa por tipo, número e ano;
 - seleção múltipla dos tribunais em implantação;
-- autenticação administrativa;
+- autenticação por usuário com perfis de Consulta, Comunicador e Administrador;
+- gestão de usuários pelo administrador, com ativação, inativação e redefinição de senha;
+- edição do texto final antes da publicação;
 - mensagens formatadas para divulgação no WhatsApp.
 
 ## Arquitetura
@@ -71,6 +73,14 @@ Para testar no runtime da Cloudflare:
 npm run preview
 ```
 
+## Perfis de acesso
+
+- **Consulta:** consulta e copia comunicados publicados;
+- **Comunicador:** cria, pré-visualiza, edita o texto final, publica e consulta;
+- **Administrador:** possui todas as permissões e gerencia usuários.
+
+O administrador inicial é configurado pelos segredos do Cloudflare. Os demais usuários são armazenados no D1, com login, e-mail, nome completo, perfil, situação e senha protegida por PBKDF2-SHA-256 com salt individual.
+
 ## Segurança
 
-O código não contém credenciais. Os comunicados publicados são imutáveis também na API: solicitações de alteração ou cancelamento recebem resposta de conflito.
+O código não contém credenciais. Usuários inativos perdem acesso imediatamente. Os comunicados publicados são imutáveis também na API: solicitações de alteração ou cancelamento recebem resposta de conflito.
