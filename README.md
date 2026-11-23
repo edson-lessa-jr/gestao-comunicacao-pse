@@ -73,14 +73,21 @@ Para testar no runtime da Cloudflare:
 npm run preview
 ```
 
-## Perfis de acesso
+## Times, integrantes e modelos
 
-- **Consulta:** consulta e copia comunicados publicados;
-- **Comunicador:** cria, pré-visualiza, edita o texto final, publica e consulta;
-- **Administrador:** possui todas as permissões e gerencia usuários.
+Após o login, selecione o time ativo (quando houver apenas um, ele abre automaticamente). O administrador geral vê todos os times e pode usar **Criar time**, informando nome e sigla. Em **Integrantes**, crie uma conta ou vincule um login existente e atribua o perfil local:
 
-O administrador inicial é configurado pelos segredos do Cloudflare. Os demais usuários são armazenados no D1, com login, e-mail, nome completo, perfil, situação e senha protegida por PBKDF2-SHA-256 com salt individual.
+- **Consulta**: consulta e copia apenas os comunicados do time.
+- **Comunicador**: também prepara, revisa e publica.
+- **Administrador de time**: também administra integrantes e os quatro textos em **Modelos do time**. Retirar um integrante não desativa sua conta em outros times.
+- **Administrador geral**: administra todos os times, inclusive os novos, e as **Contas globais**. Dados de login, senha e situação da conta existente não podem ser alterados por um administrador local.
 
-## Segurança
+Cada time recebe uma cópia dos quatro modelos originais. O editor aceita os campos fixos do formulário e os marcadores de identidade `{{time}}`, `{{sigla}}` e `{{numero}}`. A prévia é editável e não consome número. Na publicação, o texto é congelado. A sequência é independente por time, tipo e ano (Brasília).
 
-O código não contém credenciais. Usuários inativos perdem acesso imediatamente. Os comunicados publicados são imutáveis também na API: solicitações de alteração ou cancelamento recebem resposta de conflito.
+## Atualização de instalações existentes
+
+A migração D1 `0002_team_workspaces.sql` cria o time Plataforma Socioeducativa (PSE), vincula os usuários existentes e preserva os identificadores, a autoria e o conteúdo publicado. Administradores gerais existentes mantêm o acesso geral; demais usuários conservam o seu perfil na PSE. Para cada tipo/ano, continua a partir do maior valor entre o contador anterior e os números publicados. Não execute SQL de limpeza nem recrie o banco. Após ativar outros times, não reverta o Worker para uma versão sem isolamento por time.
+
+## Validação local
+
+`node --test tests/teams-migration.test.mjs` valida preservação e numeração em SQLite em memória. A migração pode ser exercitada no D1 local com `npm run db:migrate:local`.

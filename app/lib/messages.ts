@@ -1,3 +1,5 @@
+import templates from "./base-templates.json";
+import {TYPE_FIELDS} from "./forms";
 export type CommunicationType="EXTRAORDINARIA"|"ATUALIZACAO_VERSAO"|"BOLETIM_PERIODICO"|"INFORMATIVA_OPERACIONAL";
 export type Fields=Record<string,string>;
 function asBrazilInstant(value:string){return new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)?`${value}:00-03:00`:value)}
@@ -6,26 +8,47 @@ function dateOnly(value?:string){if(!value)return"data a definir";return new Int
 function timeOnly(value?:string){if(!value)return"horário a definir";return new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:"America/Sao_Paulo"}).format(asBrazilInstant(value)).replace(":","h")}
 function bullets(value?:string){return(value??"").split("\n").map(line=>line.trim()).filter(Boolean).map(line=>`▫ ${line.replace(/^[-•▫]\s*/,"")};`).join("\n")}
 function steps(value?:string){return(value??"").split("\n").map(line=>line.trim()).filter(Boolean).map((line,index)=>`${index+1}. ${line.replace(/^\d+[.)]\s*/,"")}${/[.;]$/.test(line)?"":";"}`).join("\n")}
-const manual="https://manual-pse.pdpj.jus.br/",support="https://suporteti.cnj.jus.br";
-const signature=`*Atenciosamente,*\n\n*Equipe da Plataforma Socioeducativa — PSE*\n*Programa Fazendo Justiça — DMF/CNJ*`;
-function help(includeManual=true){return `${includeManual?`📚 ${includeManual?"Consulte o Manual da PSE":""}:\n${manual}\n\n`:""}Em caso de dúvida, procure inicialmente o suporte local do tribunal. Se necessário, registre chamado em:\n${support}\n\n${signature}`}
-function code(number:number|null,year:number){return `${number===null?"[NN]":String(number).padStart(2,"0")}/${String(year).slice(-2)}`}
-export function recordTitle(type:CommunicationType,fields:Fields){if(type==="EXTRAORDINARIA")return `${fields.occurrenceType||"Ocorrência"} — PSE`;if(type==="ATUALIZACAO_VERSAO")return `Versão ${fields.version||"não informada"}`;if(type==="BOLETIM_PERIODICO")return `Boletim ${fields.referencePeriod||"periódico"}`;return fields.subject||"Comunicado informativo"}
-export function renderMessage(type:CommunicationType,number:number|null,year:number,f:Fields){
-  const n=code(number,year);
-  if(type==="EXTRAORDINARIA"){
-    const integrity=f.dataParagraph?.startsWith("Incluir")?`\n\nAté o momento, não há indicativo de perda de dados ou exclusão de informações já registradas. A ocorrência está restrita a ${f.occurrenceRestriction||"acesso, processamento, integração ou exibição de informações"}.`:"";
-    return `*COMUNICADO EXTRAORDINÁRIO PSE Nº ${n}*\n\n🚨 *ATENÇÃO — ${f.occurrenceType}*\n\n📅 ${dateTime(f.eventDateTime)}\n\nPrezados(as) usuários(as),\n\nInformamos que a Plataforma Socioeducativa (PSE) está apresentando ${f.occurrenceDescription}.\n\nA situação pode afetar:\n\n${bullets(f.affectedItems)}\n▫ ${f.impactedAudience}.\n\nA equipe técnica já foi acionada e atua com prioridade na identificação da causa e na regularização do serviço.\n\n📌 *Orientação aos usuários*\n\n${f.userGuidance}.${integrity}\n\nPedimos desculpas pelos transtornos e agradecemos a compreensão e a colaboração de todos(as).\n\n🎙 *A próxima atualização será divulgada ${f.nextUpdate}.*\n\nProblemas diferentes da ocorrência descrita devem ser encaminhados inicialmente ao suporte local do tribunal. Se necessário, registre chamado em:\n${support}\n\n${signature}`;
+
+export const baseTemplates=templates;
+export const isType=(key:unknown):key is CommunicationType => typeof key==="string" && Object.hasOwn(templates,key);
+type Identity={name:string;acronym:string};
+export function recordTitle(type:CommunicationType,fields:Fields,team:Identity){if(type==="EXTRAORDINARIA")return (fields.occurrenceType||"Ocorrência")+" — "+team.acronym;if(type==="ATUALIZACAO_VERSAO")return "Versão "+(fields.version||"não informada");if(type==="BOLETIM_PERIODICO")return "Boletim "+(fields.referencePeriod||"periódico");return fields.subject||"Comunicado informativo"}
+
+function values(type:CommunicationType,team:Identity,year:number,f:Fields) {
+  const map:Fields=Object.create(null);
+  Object.assign(map,{time:team.name,sigla:team.acronym,timeMaiusculo:team.name.toUpperCase(),numero:"[NN]/"+String(year).slice(-2)});
+  for(const field of TYPE_FIELDS[type]){
+    const k=field.key, v=f[k]||"";
+    map[k]=v;
+    if(field.type==="datetime-local"){map[k+"DataHora"]=dateTime(v);map[k+"Hora"]=timeOnly(v);}
+    if(field.type==="date")map[k+"Data"]=dateOnly(v);
+    if(field.type==="textarea")map[k+"Lista"]=bullets(v);
   }
-  if(type==="ATUALIZACAO_VERSAO"){
-    const sections=[f.newFeatures?`🆕 *Novas funcionalidades*\n\n${bullets(f.newFeatures)}`:"",f.improvements?`⚙️ *Melhorias*\n\n${bullets(f.improvements)}`:"",f.fixes?`🛠 *Correções*\n\n${bullets(f.fixes)}`:""].filter(Boolean).join("\n\n");
-    const integration=f.integrationUpdate==="Sim"?`\n\n⚠️ A utilização da funcionalidade dependerá da atualização do ${f.integratedComponent||"componente integrado"} para a versão ${f.minimumVersion||"mínima indicada"}. As orientações técnicas serão encaminhadas às equipes de TI dos tribunais.`:"";
-    return `*COMUNICADO DE ATUALIZAÇÃO PSE Nº ${n}*\n\n🆕 *ATUALIZAÇÃO DA PLATAFORMA SOCIOEDUCATIVA — VERSÃO ${f.version}*\n\n📅 Disponibilização: ${dateTime(f.releaseDateTime)}\n\nPrezados(as) usuários(as),\n\nInformamos que a versão *${f.version}* da Plataforma Socioeducativa (PSE) será disponibilizada em ${dateTime(f.releaseDateTime)}.\n\nA atualização contempla as seguintes entregas:\n\n${sections}\n\n📌 *Impactos da atualização*\n\n▫ Perfis ou unidades impactados: ${f.impactedProfiles};\n▫ Processos de negócio impactados: ${f.businessProcesses};\n▫ Integrações impactadas: ${f.integrations}.\n\n📋 *Ação esperada do tribunal*\n\n${f.expectedAction}.${integration}\n\n⏱ *Janela de implantação*\n\nA implantação ocorrerá em ${dateOnly(f.deploymentStart?.slice(0,10))}, das ${timeOnly(f.deploymentStart)} às ${timeOnly(f.deploymentEnd)}.\n\nDurante esse período, ${f.availabilityImpact}.\n\n📚 As orientações de uso estão disponíveis no Manual da PSE:\n${manual}\n\nEm caso de dúvida, procure inicialmente o suporte local do tribunal. Se necessário, registre chamado em:\n${support}\n\n${signature}`;
+  if(type==="EXTRAORDINARIA")Object.assign(map,{incluirIntegridade:f.dataParagraph?.startsWith("Incluir")?"1":"",restricao:f.occurrenceRestriction||"acesso, processamento, integração ou exibição de informações"});
+  if(type==="ATUALIZACAO_VERSAO")Object.assign(map,{atualizarIntegracao:f.integrationUpdate==="Sim"?"1":"",componente:f.integratedComponent||"componente integrado",versaoMinima:f.minimumVersion||"mínima indicada",diaImplantacao:dateOnly(f.deploymentStart?.slice(0,10))});
+  if(type==="BOLETIM_PERIODICO")Object.assign(map,{responsavel:f.responsible||"a definir",dataPrazo:dateOnly(f.deadline)});
+  if(type==="INFORMATIVA_OPERACIONAL")Object.assign(map,{assuntoMaiusculo:(f.subject||"").toUpperCase(),passos:steps(f.steps),prazo:f.deadlineMode==="Não há prazo aplicável"?"Não há prazo aplicável.":(f.deadlineMode||"")+" "+dateOnly(f.deadline)+".",pontosAtencao:bullets(f.attentionPoints)||"▫ Não há pontos de atenção adicionais.",documentacao:f.documentationLink||"Não há documentação específica."});
+  return map;
+}
+export function tokensFor(type:CommunicationType){return Object.keys(values(type,{name:"",acronym:""},2000,{}))}
+export function renderTemplate(body:string,type:CommunicationType,team:Identity,year:number,f:Fields) {
+  if(!body.trim()||body.length>40000)throw Error("O modelo deve conter de 1 a 40.000 caracteres.");
+  if(body.split("{{numero}}").length!==2 || !body.split("\n")[0].includes("{{numero}}"))throw Error("Inclua {{numero}} uma vez no cabeçalho.");
+  const vars=values(type,team,year,f);
+  const stack=[{key:"",parts:[] as string[]}];
+  for(const part of body.split(/(\{\{[^{}]*\}\})/)){
+    if(!part)continue;
+    const top=stack[stack.length-1];
+    if(!part.startsWith("{{")){if(part.includes("{{")||part.includes("}}"))throw Error("Marcador incompleto.");top.parts.push(part);continue;}
+    const token=part.slice(2,-2), key=token.replace(/^[#/]/,"");
+    if(!Object.hasOwn(vars,key) && key!=="secoes")throw Error("Campo desconhecido: "+key);
+    if(token.startsWith("#")){stack.push({key,parts:[]});continue;}
+    if(token.startsWith("/")){
+      if(top.key!==key||stack.length<2)throw Error("Bloco inválido: "+token);
+      stack.pop();
+      if(key==="secoes"||vars[key])stack[stack.length-1].parts.push(top.parts.filter(Boolean).join(key==="secoes"?"\n\n":""));
+    }else {if(key==="secoes")throw Error("Use secoes como bloco.");top.parts.push(vars[key]);}
   }
-  if(type==="BOLETIM_PERIODICO"){
-    const optional=[f.inDevelopment?`🚧 *Em desenvolvimento*\n\n${bullets(f.inDevelopment)}`:"",f.inAnalysis?`🔎 *Em análise*\n\n${bullets(f.inAnalysis)}`:"",f.priorities?`🗓 *Próximas prioridades*\n\n${bullets(f.priorities)}`:"",f.deployments?`🔗 *Implantações e integrações*\n\n${bullets(f.deployments)}`:"",f.attentionActions?`📌 *Ações ou pontos de atenção para os tribunais*\n\n${bullets(f.attentionActions)}\n▫ Responsável: ${f.responsible||"a definir"};\n▫ Prazo: ${dateOnly(f.deadline)}.`:""].filter(Boolean).join("\n\n");
-    return `*BOLETIM PERIÓDICO PSE Nº ${n}*\n\n📰 *EVOLUÇÃO DA PLATAFORMA SOCIOEDUCATIVA*\n\n📅 Período de referência: ${f.referencePeriod}\n\nPrezados(as) usuários(as),\n\nApresentamos as principais entregas realizadas no período e o andamento das próximas evoluções da Plataforma Socioeducativa (PSE).\n\n✅ *Entregas disponibilizadas*\n\n${bullets(f.delivered)}\n\n${optional}\n\n⚠️ Os itens classificados como “em desenvolvimento”, “em análise” ou “próximas prioridades” representam o planejamento atual da PSE. O conteúdo e as previsões poderão ser ajustados conforme decisões negociais, dependências técnicas e prioridades institucionais.\n\n${help(true)}`;
-  }
-  const procedure=f.steps?`\n\nQuando necessário:\n\n${steps(f.steps)}`:"";const deadline=f.deadlineMode==="Não há prazo aplicável"?"Não há prazo aplicável.":`${f.deadlineMode} ${dateOnly(f.deadline)}.`;
-  return `*COMUNICADO INFORMATIVO PSE Nº ${n}*\n\n📢 *${f.subject?.toUpperCase()}*\n\n📅 ${dateOnly(f.publicationDate)}\n\nPrezados(as) usuários(as),\n\nInformamos que ${f.information}.\n\n👥 *Público-alvo*\n\n${f.targetAudience}\n\n📌 *Orientação*\n\n${f.guidance}${procedure}\n\n⏳ *Prazo*\n\n${deadline}\n\n⚠️ *Pontos de atenção*\n\n${bullets(f.attentionPoints)||"▫ Não há pontos de atenção adicionais."}\n\n📚 *Documentação*\n\nAs orientações complementares estão disponíveis em:\n${f.documentationLink||"Não há documentação específica."}\n\nManual da PSE:\n${manual}\n\nEm caso de dúvida, procure inicialmente o suporte local do tribunal. Se necessário, registre chamado em:\n${support}\n\n${signature}`;
+  if(stack.length!==1)throw Error("Feche o bloco "+stack[stack.length-1].key+".");
+  return stack[0].parts.join("");
 }

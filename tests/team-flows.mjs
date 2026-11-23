@@ -1,0 +1,52 @@
+// Smoke test against a disposable LOCAL Worker only. Never points to a remote deployment.
+import assert from "node:assert/strict";
+import {randomUUID} from "node:crypto";
+const url="http://127.0.0.1:8787/api/",pw=process.env.PSE_ADMIN_PASSWORD;
+if(!pw)throw Error("Configure apenas credenciais de teste locais.");
+async function req(path,cookie="",method="GET",body,expected=200){
+  const r=await fetch(url+path,{method,headers:{"Content-Type":"application/json",cookie},body:body===undefined?undefined:JSON.stringify(body)});
+  const data=await r.json();assert.equal(r.status,expected,method+" "+path+": "+JSON.stringify(data));return data;
+}
+async function login(username,password){const r=await fetch(url+"auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});assert.equal(r.status,200);return r.headers.get("set-cookie").split(";")[0]}
+const admin=await login(process.env.PSE_ADMIN_USER,pw), suffix=randomUUID().slice(0,8);
+const mkTeam=async prefix=>(await req("teams",admin,"POST",{name:"Equipe "+prefix,acronym:prefix+suffix},201)).team;
+const a=await mkTeam("ALFA"),b=await mkTeam("BETA"), inTeam=(name,t)=>name+"?team="+t.id;
+const acc=(login,role)=>({action:"create",login:login+suffix,password:pw,fullName:"Pessoa de Teste",email:login+suffix+"@example.test",role,status:"ATIVO"});
+const first=acc("local","ADMIN_TIME"),second=acc("autor","COMUNICADOR");
+await req(inTeam("members",a),admin,"POST",first,201);
+const local=await login(first.login,pw);
+await req(inTeam("members",a),local,"POST",second,201);
+await req(inTeam("members",b),admin,"POST",{action:"link",login:second.login,role:"CONSULTA"},201);
+const author=await login(second.login,pw);
+assert.deepEqual((await req("teams",local)).teams.map(t=>t.id),[a.id]);
+assert.deepEqual(new Set((await req("teams",author)).teams.map(t=>t.id)),new Set([a.id,b.id]));
+await req("teams",local,"POST",{name:"Negado",acronym:"NA"},403);
+await req(inTeam("members",b),local,"GET",undefined,403);
+await req(inTeam("communications",b),local,"GET",undefined,403);
+await req("users",local,"GET",undefined,403);
+await req(inTeam("members",a),local,"POST",acc("proibido","ADMIN"),400);
+const type="BOLETIM_PERIODICO",getTpl=t=>inTeam("templates",t)+"&type="+type;
+const initial=(await req(getTpl(b),admin)).body;
+assert.equal((await req(getTpl(a),local)).body,initial);
+const custom="Boletim {{sigla}} Nº {{numero}}\n{{time}}: {{referencePeriod}}\n{{delivered}}";
+await req(inTeam("templates",a),local,"PUT",{type,body:custom});
+assert.equal((await req(getTpl(b),admin)).body,initial);
+await req(getTpl(a),author,"GET",undefined,403);
+const fields={referencePeriod:"Novembro",delivered:"Entrega da equipe PSE."},preview={action:"preview",type,fields};
+await req(inTeam("communications",b),author,"POST",preview,403);
+const apiA=inTeam("communications",a);
+const sample=(await req(apiA,author,"POST",preview)).preview;
+assert.ok(sample.renderedMessage.includes(a.acronym)&&sample.renderedMessage.includes(a.name)&&sample.renderedMessage.includes(fields.delivered));
+const publish={...preview,action:"publish",renderedMessage:sample.renderedMessage+" Editado."};
+const results=await Promise.all([req(apiA,author,"POST",publish,201),req(apiA,author,"POST",publish,201)]);
+assert.deepEqual(results.map(x=>x.communication.number).sort(),[1,2]);assert.equal(results[0].communication.createdBy,second.login);
+const apiB=inTeam("communications",b),pb=(await req(apiB,admin,"POST",preview)).preview;
+assert.equal((await req(apiB,admin,"POST",{...publish,renderedMessage:pb.renderedMessage},201)).communication.number,1);
+await req(inTeam("templates",a),local,"PUT",{type,body:initial});
+assert.equal((await req(apiA,author)).communications.length,2);
+assert.equal((await req(apiB,author)).communications.length,1);
+assert.equal((await req(apiA,author)).communications[0].renderedMessage.endsWith(" Editado."),true);
+await req(apiA,admin,"PATCH",{},409);
+const member=(await req(inTeam("members",a),local)).members.find(m=>m.login===second.login);
+await req(inTeam("members",a),local,"DELETE",{id:member.id});await req(apiA,author,"GET",undefined,403);await req(apiB,author);
+console.log("OK: perfis, vínculo múltiplo, isolamento, modelos, texto editado imutável, publicação concorrente, retirada sem afetar outro time.");

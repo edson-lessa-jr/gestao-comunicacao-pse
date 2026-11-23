@@ -8,7 +8,7 @@ type ManagedUser = { id: number; login: string; email: string; fullName: string;
 type UserForm = { login: string; email: string; password: string; fullName: string; role: UserRole; status: UserStatus };
 
 const EMPTY_FORM: UserForm = { login: "", email: "", password: "", fullName: "", role: "CONSULTA", status: "ATIVO" };
-const ROLE_LABELS: Record<UserRole, string> = { CONSULTA: "Consulta", COMUNICADOR: "Comunicador", ADMIN: "Administrador" };
+const ROLE_LABELS: Record<UserRole, string> = { CONSULTA: "Por time", COMUNICADOR: "Por time", ADMIN: "Administrador geral" };
 
 export default function UserManagement() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -80,12 +80,12 @@ export default function UserManagement() {
 
   return <section className="users-layout">
     <form className="user-form-panel" onSubmit={submit}>
-      <div className="panel-heading"><div><p className="eyebrow">Acesso ao sistema</p><h2>{editingId ? "Editar usuário" : "Cadastrar usuário"}</h2></div>{editingId ? <button type="button" className="secondary" onClick={reset}>Cancelar edição</button> : null}</div>
+      <div className="panel-heading"><div><p className="eyebrow">Administração geral</p><h2>{editingId ? "Editar usuário" : "Cadastrar conta global"}</h2></div>{editingId ? <button type="button" className="secondary" onClick={reset}>Cancelar edição</button> : null}</div>
       <div className="fields-grid">
         <label><span className="field-label">Login (identificador)<em>*</em></span><input value={form.login} onChange={event => update("login", event.target.value.toLowerCase())} autoComplete="off" placeholder="Ex.: nome.sobrenome" required /></label>
         <label><span className="field-label">E-mail<em>*</em></span><input type="email" value={form.email} onChange={event => update("email", event.target.value)} autoComplete="off" placeholder="nome@dominio.jus.br" required /></label>
         <label className="wide"><span className="field-label">Nome completo<em>*</em></span><input value={form.fullName} onChange={event => update("fullName", event.target.value)} autoComplete="off" required /></label>
-        <label><span className="field-label">Perfil<em>*</em></span><select value={form.role} onChange={event => update("role", event.target.value as UserRole)} required><option value="CONSULTA">Consulta</option><option value="COMUNICADOR">Comunicador</option><option value="ADMIN">Administrador</option></select></label>
+        <label><span className="field-label">Acesso global<em>*</em></span><select value={form.role} onChange={event => update("role", event.target.value as UserRole)} required><option value="CONSULTA">Sem administração geral</option>{form.role==="COMUNICADOR"&&<option value="COMUNICADOR">Sem administração geral (legado)</option>}<option value="ADMIN">Administrador geral</option></select></label>
         <label><span className="field-label">Situação<em>*</em></span><select value={form.status} onChange={event => update("status", event.target.value as UserStatus)} required><option value="ATIVO">Ativo</option><option value="INATIVO">Inativo</option></select></label>
         <label className="wide"><span className="field-label">{editingId ? "Nova senha" : "Senha"}{editingId ? null : <em>*</em>}</span><input type="password" value={form.password} onChange={event => update("password", event.target.value)} autoComplete="new-password" minLength={8} required={!editingId} placeholder={editingId ? "Deixe em branco para manter a senha atual" : "Mínimo de 8 caracteres"} /></label>
       </div>
@@ -95,7 +95,7 @@ export default function UserManagement() {
     </form>
 
     <section className="users-list-panel">
-      <div className="panel-heading"><div><p className="eyebrow">Controle de acesso</p><h2>Usuários cadastrados</h2><p>{users.length} usuário(s)</p></div></div>
+      <div className="panel-heading"><div><p className="eyebrow">Contas globais · atribua os perfis locais em Integrantes</p><h2>Usuários cadastrados</h2><p>{users.length} usuário(s)</p></div></div>
       <div className="users-table-wrap"><table className="users-table"><thead><tr><th>Usuário</th><th>Login</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>{users.length ? users.map(user => <tr key={user.id}><td><strong>{user.fullName}</strong><small>{user.email}</small></td><td>{user.login}</td><td>{ROLE_LABELS[user.role]}</td><td><span className={`status ${user.status.toLowerCase()}`}>{user.status === "ATIVO" ? "ATIVO" : "INATIVO"}</span></td><td><button className="table-action" onClick={() => edit(user)}>Editar</button></td></tr>) : <tr><td colSpan={5} className="empty-table">Nenhum usuário cadastrado.</td></tr>}</tbody></table></div>
     </section>
   </section>;
